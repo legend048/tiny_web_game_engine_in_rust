@@ -1,14 +1,15 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+extern "C" {
+    pub fn log_number(number: usize);
+    fn change_screen_color(red: f32, green: f32, blue: f32, alpha: f32);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+pub fn clear_screen_color(red: f32, green: f32, blue: f32, alpha: f32){
+    unsafe {
+        change_screen_color(red, green, blue, alpha);
     }
+}
+
+#[no_mangle]
+pub extern "C" fn key_pressed() {
+    clear_screen_color(0.0, 1.0, 0.0, 1.0);
 }

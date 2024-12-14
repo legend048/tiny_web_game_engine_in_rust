@@ -1,9 +1,3 @@
-extern "C" {
-    pub fn log_number(number: usize);
-}
-
 fn main() {
-    unsafe {
-        log_number(4);
-    }
+    game_engine::clear_screen_color(0.0, 0.0, 1.0, 1.0);
 }
