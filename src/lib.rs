@@ -1,5 +1,3 @@
-use core::borrow;
-
 pub struct Context {}
 
 pub enum Key {
@@ -18,7 +16,7 @@ pub enum Event{
 extern "C" {
     pub fn log_number(number: usize);
     fn change_screen_color(red: f32, green: f32, blue: f32, alpha: f32);
-    fn js_draw_rectangle(x: f32, y: f32, width: f32, height: f32);
+    fn js_draw_rectangle(x: f32, y: f32, width: f32, height: f32, red: f32, green: f32, blue: f32, alpha: f32);
 }
 
 thread_local! {
@@ -39,9 +37,9 @@ impl Context {
     }
 
 
-    pub fn draw_rectangle(&mut self ,x: f32, y: f32, width: f32, height: f32){
+    pub fn draw_rectangle(&mut self ,x: f32, y: f32, width: f32, height: f32, red: f32, green: f32, blue: f32, alpha: f32){
         unsafe {
-            js_draw_rectangle(x, y, width, height);
+            js_draw_rectangle(x, y, width, height, red, green, blue, alpha);
         }
     }
 }
