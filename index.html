@@ -99,6 +99,12 @@
 
                 result.instance.exports.key_pressed(code);
             };
+
+            function animate(){
+                result.instance.exports.animate();
+                requestAnimationFrame(animate);
+            }
+            requestAnimationFrame(animate)
         });
     </script>
     </body>
