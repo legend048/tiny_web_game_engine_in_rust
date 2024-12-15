@@ -17,7 +17,7 @@ fn main() {
 
     let speed = 5.0;
 
-    game_engine::set_event_handler(move |event| match event {
+    game_engine::set_event_handler(move |context ,event| match event {
         game_engine::Event::Draw => {
             x_pos += x_dir * speed;
             y_pos += y_dir * speed;
@@ -30,8 +30,8 @@ fn main() {
                 y_dir *= -1.0;
             }
 
-            game_engine::clear_screen_color(0.0, 0.0, 0.3, 1.0);
-            game_engine::draw_rectangle(x_pos, y_pos, 100., 100.);
+            context.clear_screen_color(0.0, 0.0, 0.3, 1.0);
+            context.draw_rectangle(x_pos, y_pos, 100., 100.);
         }
         _ => {}
     });
