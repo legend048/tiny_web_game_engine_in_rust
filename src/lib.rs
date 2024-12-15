@@ -9,6 +9,7 @@ pub enum Key {
 extern "C" {
     pub fn log_number(number: usize);
     fn change_screen_color(red: f32, green: f32, blue: f32, alpha: f32);
+    fn js_draw_rectangle(x: f32, y: f32, width: f32, height: f32);
 }
 
 pub fn clear_screen_color(red: f32, green: f32, blue: f32, alpha: f32){
@@ -41,4 +42,11 @@ pub extern "C" fn key_pressed(value: usize) {
     };
 
     EVENT_HANDLER.with(|event_handler| (event_handler.borrow_mut())(key))
+}
+
+
+pub fn draw_rectangle(x: f32, y: f32, width: f32, height: f32){
+    unsafe {
+        js_draw_rectangle(x, y, width, height);
+    }
 }
