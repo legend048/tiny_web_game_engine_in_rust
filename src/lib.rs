@@ -1,26 +1,41 @@
-pub struct Context {}
+pub mod game;
+
+use wasm_bindgen::prelude::*;
+
+
+pub struct Context {
+    pub last_time: f64,
+}
 
 pub enum Key {
     Left,
     Right,
     Up,
     Down,
-    Space
+    Space,
 }
 
-pub enum Event{
+pub enum Event {
     KeyDown(Key),
     Draw,
 }
 
+#[wasm_bindgen]
 extern "C" {
     pub fn log_number(number: usize);
-    fn change_screen_color(red: f32, green: f32, blue: f32, alpha: f32);
-    fn js_draw_rectangle(x: f32, y: f32, width: f32, height: f32, red: f32, green: f32, blue: f32, alpha: f32);
+    pub fn change_screen_color(red: f32, green: f32, blue: f32, alpha: f32);
+    pub fn js_draw_rectangle(x: f32, y: f32, width: f32, height: f32, red: f32, green: f32, blue: f32, alpha: f32);
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    pub fn log(s: &str);
 }
 
 thread_local! {
-    pub static EVENT_HANDLER_AND_CONTEXT: std::cell::RefCell<(Box<dyn FnMut(&mut Context, Event)>, Context)> = std::cell::RefCell::new((Box::new(|_, _|{}), Context {}));
+    pub static EVENT_HANDLER_AND_CONTEXT: std::cell::RefCell<(Box<dyn FnMut(&mut Context, Event)>, Context)> =
+        std::cell::RefCell::new((Box::new(|_, _| {}), Context { last_time: 0.0 }));
 }
 
 pub fn set_event_handler(function: impl FnMut(&mut Context, Event) + 'static) {
@@ -30,29 +45,30 @@ pub fn set_event_handler(function: impl FnMut(&mut Context, Event) + 'static) {
 }
 
 impl Context {
-    pub fn clear_screen_color(&mut self, red: f32, green: f32, blue: f32, alpha: f32){
-        unsafe {
-            change_screen_color(red, green, blue, alpha);
-        }
+    pub fn clear_screen_color(&mut self, red: f32, green: f32, blue: f32, alpha: f32) {
+        change_screen_color(red, green, blue, alpha);
     }
 
+    pub fn draw_rectangle(&mut self, x: f32, y: f32, width: f32, height: f32, red: f32, green: f32, blue: f32, alpha: f32) {
+        js_draw_rectangle(x, y, width, height, red, green, blue, alpha);
+    }
 
-    pub fn draw_rectangle(&mut self ,x: f32, y: f32, width: f32, height: f32, red: f32, green: f32, blue: f32, alpha: f32){
-        unsafe {
-            js_draw_rectangle(x, y, width, height, red, green, blue, alpha);
-        }
+    pub fn update_time(&mut self, current_time: f64) -> f64 {
+        let delta_time = current_time - self.last_time;
+        self.last_time = current_time;
+        delta_time
     }
 }
 
-fn send_event(event: Event) {
-    EVENT_HANDLER_AND_CONTEXT.with(|event_handler_and_context|{
+pub fn send_event(event: Event) {
+    EVENT_HANDLER_AND_CONTEXT.with(|event_handler_and_context| {
         let mut borrow = event_handler_and_context.borrow_mut();
         let (event_handler, context) = &mut *borrow;
         (event_handler)(context, event)
-    })
+    });
 }
 
-#[no_mangle]
+#[wasm_bindgen]
 pub extern "C" fn key_pressed(value: usize) {
     let key = match value {
         1 => Key::Left,
@@ -66,7 +82,12 @@ pub extern "C" fn key_pressed(value: usize) {
     send_event(Event::KeyDown(key));
 }
 
-#[no_mangle]
-pub extern "C" fn animate(){
+#[wasm_bindgen]
+pub extern "C" fn animate(current_time: f64) {
+    EVENT_HANDLER_AND_CONTEXT.with(|ctx| {
+        let mut borrow = ctx.borrow_mut();
+        let (_, context) = &mut *borrow;
+        context.update_time(current_time);
+    });
     send_event(Event::Draw);
 }

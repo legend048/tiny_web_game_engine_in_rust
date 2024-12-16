@@ -1,0 +1,16 @@
+2. Shader Error Debugging
+3. Better Drawing Performance
+4. Add Mouse Events
+5. Asset Loading
+6. Camera Implementation
+
+
+Future Features:
+1. Physics Engine
+2. Scene Graph (hierarchy of game objects for structured rendering and updates)
+3. Input Management
+4. Animation Support (Add utility functions for sprite animations or tweening)
+
+
+Done:
+1. Canvas Resizing

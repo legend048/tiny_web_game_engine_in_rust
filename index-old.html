@@ -1,0 +1,131 @@
+<html>
+    <body style="margin:0; overflow-y: hidden;overflow-x: hidden;">
+    <canvas id="my_canvas" style="width:100vw; height: 100vh;"></canvas>
+    <script>
+        let canvas = document.getElementById("my_canvas");
+        let gl = canvas.getContext('webgl');
+
+        let vertex_shader = gl.createShader(gl.VERTEX_SHADER)
+        gl.shaderSource(vertex_shader, `
+            attribute vec2 vertex_position;
+            void main(void){
+                gl_Position = vec4(vertex_position, 0.0, 1.0);
+            }
+        `);
+        gl.compileShader(vertex_shader);
+
+        let fragment_shader = gl.createShader(gl.FRAGMENT_SHADER)
+        gl.shaderSource(fragment_shader, `
+            precision mediump float;
+            uniform vec4 color;
+            void main(){
+                gl_FragColor = color;
+            }
+        `)
+        gl.compileShader(fragment_shader);
+
+        let program = gl.createProgram();
+        gl.attachShader(program, vertex_shader);
+        gl.attachShader(program, fragment_shader);
+        gl.linkProgram(program);
+
+        let position_attribute_location = gl.getAttribLocation(program, 'vertex_position');
+        gl.enableVertexAttribArray(position_attribute_location);
+        let color_uniform_location = gl.getUniformLocation(program, "color");
+
+        gl.canvas.width = canvas.clientWidth;
+        gl.canvas.height = canvas.clientHeight;
+        gl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight);
+        window.addEventListener('resize', () => {
+            gl.canvas.width = canvas.clientWidth;
+            gl.canvas.height = canvas.clientHeight;
+            gl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight);
+        });
+
+
+
+        gl.clearColor(1, 0, 0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT)
+
+        let imports = {
+            env: {
+                log_number: function (number) { console.log("Number from Rust: ", number); },
+                
+                change_screen_color: function(red, green, blue, alpha){
+                    gl.clearColor(red, green, blue, alpha);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+                },
+
+                js_draw_rectangle: function(x, y, width, height, red, green, blue, alpha){
+                    if (!window.vertexBuffer) {
+                        window.vertexBuffer = gl.createBuffer();
+                    }
+                    gl.bindBuffer(gl.ARRAY_BUFFER, window.vertexBuffer);
+
+                    function adjust_pos(size, pos) {
+                        return (pos / size) * 2.0 - 1.0;
+                    }
+
+                    const vertices = new Float32Array([
+                        adjust_pos(gl.canvas.width, x), adjust_pos(gl.canvas.height, y),
+                        adjust_pos(gl.canvas.width, x + width), adjust_pos(gl.canvas.height, y),
+                        adjust_pos(gl.canvas.width, x + width), adjust_pos(gl.canvas.height, y + height),
+                        adjust_pos(gl.canvas.width, x), adjust_pos(gl.canvas.height, y + height),
+                    ]);
+
+                    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+                    gl.vertexAttribPointer(position_attribute_location, 2, gl.FLOAT, false, 0, 0);
+                    gl.enableVertexAttribArray(position_attribute_location);
+
+                    gl.useProgram(program);
+                    gl.uniform4f(color_uniform_location, red, green, blue, alpha);
+                    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+                    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+                }
+            }
+        };
+        WebAssembly.instantiateStreaming(fetch('target/wasm32-unknown-unknown/debug/examples/game.wasm'), imports).then(function (result) {
+            result.instance.exports.main();
+            
+            document.onkeydown = function (event){
+                let code = 0;
+                switch (event.code){
+                    case "ArrowLeft":
+                        code = 1;
+                        break;
+                    case "ArrowRight":
+                        code = 2;
+                        break;
+                    case "ArrowUp":
+                        code = 3;
+                        break;
+                    case "ArrowDown":
+                        code = 4;
+                        break;
+                    case "Space":
+                        code = 5;
+                        break;
+                }
+
+                result.instance.exports.key_pressed(code);
+            };
+
+            function animate(timestamp){
+                result.instance.exports.animate(timestamp / 1000.0);
+                requestAnimationFrame(animate);
+            }
+            requestAnimationFrame(animate)
+
+            canvas.addEventListener('mousemove', (event) => {
+                let rect = canvas.getBoundingClientRect();
+                let x = event.clientX - rect.left;
+                let y = event.clientY - rect.top;
+                result.instance.exports.mouse_move(x, y);
+            });
+
+        });
+    </script>
+    </body>
+</html>
