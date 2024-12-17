@@ -1,18 +1,21 @@
 use wasm_bindgen::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::{log_number, send_event, set_event_handler, Event, Key, log};
-// use crate::{set_event_handler, Event, Key, log, log_number};
+use crate::{*};
 use rand::Rng;
+
+thread_local! {
+    pub static SPEED: RefCell<f64> = RefCell::new(1.0);
+}
 
 #[wasm_bindgen]
 pub fn run_game() {
-    let snake = Rc::new(RefCell::new(vec![(400.0, 300.0)])); // Initial snake position
-    let direction = Rc::new(RefCell::new((1.0, 0.0)));       // Initial direction (moving right)
-    let grid_size = 20.0;                                   // Size of each grid cell
-    let canvas_width = 800.0;                               // Canvas width
-    let canvas_height = 600.0;                              // Canvas height
-    let food = Rc::new(RefCell::new(generate_food(canvas_width, canvas_height, grid_size))); // Initial food position
+    let snake = Rc::new(RefCell::new(vec![(400.0, 300.0)]));
+    let direction = Rc::new(RefCell::new((1.0, 0.0)));
+    let grid_size = 20.0;
+    let canvas_width = 800.0;
+    let canvas_height = 600.0;
+    let food = Rc::new(RefCell::new(generate_food(canvas_width, canvas_height, grid_size)));
     let mut score = 0;
 
     set_event_handler({
@@ -32,16 +35,16 @@ pub fn run_game() {
                 };
             }
             Event::Draw => {
-                context.clear_screen_color(0.0, 0.0, 0.0, 1.0); // Black background
+                // log(&format!("FPS: {:.2}", context.fps));
+
+                context.clear_screen_color(0.0, 0.0, 0.0, 1.0);
 
                 let mut snake = snake.borrow_mut();
                 let dir = *direction.borrow();
 
-                // Calculate new head position
                 let (head_x, head_y) = snake[0];
                 let mut new_head = (head_x + dir.0 * grid_size, head_y + dir.1 * grid_size);
 
-                // Wrap around the canvas
                 if new_head.0 < 0.0 {
                     new_head.0 = canvas_width - grid_size;
                 } else if new_head.0 >= canvas_width {
@@ -54,44 +57,43 @@ pub fn run_game() {
                     new_head.1 = 0.0;
                 }
 
-                // Check if snake eats food
                 let mut food_pos = food.borrow_mut();
                 if (new_head.0 - food_pos.0).abs() < f64::EPSILON && (new_head.1 - food_pos.1).abs() < f64::EPSILON {
                     score += 1;
-                    log_number(score);
-                    *food_pos = generate_food(canvas_width, canvas_height, grid_size); // Generate new food
+                    update_score(score);
+                    *food_pos = generate_food(canvas_width, canvas_height, grid_size);
                 } else {
-                    snake.pop(); // Remove the tail if no food is eaten
+                    snake.pop();
                 }
 
-                // Add the new head to the front of the snake
                 snake.insert(0, new_head);
 
-                // Draw the snake
                 for &(x, y) in &*snake {
                     context.draw_rectangle(
                         x as f32, 
                         y as f32, 
-                        grid_size as f32, // Use the grid size for width
-                        grid_size as f32, // Use the grid size for height
-                        0.0, 1.0, 0.0, 1.0, // Snake color (Green)
+                        grid_size as f32, 
+                        grid_size as f32, 
+                        0.0, 1.0, 0.0, 1.0, 
                     );
-                    
                 }
 
-                // Draw the food
                 context.draw_rectangle(
                     food_pos.0 as f32, 
                     food_pos.1 as f32, 
                     grid_size as f32, 
                     grid_size as f32, 
-                    1.0, 0.0, 0.0, 1.0, // Red color
+                    1.0, 0.0, 0.0, 1.0,
                 );
-
-                // Debugging logs (optional)
-                log(&format!("Snake position: {:?}, Food position: {:?}", *snake, *food_pos));
             }
         }
+    });
+}
+
+#[wasm_bindgen]
+pub fn update_speed(new_speed: f64) {
+    SPEED.with(|speed| {
+        *speed.borrow_mut() = new_speed;
     });
 }
 
@@ -106,33 +108,35 @@ fn generate_food(canvas_width: f64, canvas_height: f64, grid_size: f64) -> (f64,
 
 #[wasm_bindgen]
 pub fn animate_frame(_current_time: f64) {
-    send_event(Event::Draw); // Trigger draw event
+    send_event(Event::Draw);
 }
 
 #[wasm_bindgen(start)]
 pub fn main() {
-    run_game();
-    start_animation_loop();
+    run_game(); // Start the game logic
+    start_animation_loop(); // Start the animation loop
 }
 
 fn start_animation_loop() {
     use wasm_bindgen::JsCast;
     use web_sys::window;
 
-    let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
-    let g = f.clone();
+    let f: Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>> = Rc::new(RefCell::new(None));
+    let g = Rc::clone(&f);
 
-    *g.borrow_mut() = Some(Closure::wrap(Box::new({
-        let g = g.clone();
-        move || {
-            animate_frame(0.0);
+    *f.borrow_mut() = Some(Closure::wrap(Box::new(move |current_time: f64| {
+        // Clone the Rc<RefCell> for the next animation frame
+        let g_clone = Rc::clone(&g);
 
-            window()
-                .unwrap()
-                .request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref())
-                .unwrap();
-        }
-    }) as Box<dyn FnMut()>));
+        // Call the Rust animate function with the current time
+        crate::animate(current_time);
+
+        // Request the next animation frame
+        window()
+            .unwrap()
+            .request_animation_frame(g_clone.borrow().as_ref().unwrap().as_ref().unchecked_ref())
+            .unwrap();
+    }) as Box<dyn FnMut(f64)>));
 
     window()
         .unwrap()

@@ -1,4 +1,4 @@
-import init, { key_pressed } from './out/game_engine.js';
+import init, { key_pressed, update_speed, get_fps } from './out/game_engine.js';
 
 const canvas = document.getElementById("my_canvas");
 const gl = canvas.getContext("webgl");
@@ -21,8 +21,6 @@ if (!gl) {
         }
     `;
 
-
-    // Create and link shaders into a WebGL program
     const createShader = (type, source) => {
         const shader = gl.createShader(type);
         gl.shaderSource(shader, source);
@@ -48,10 +46,9 @@ if (!gl) {
         console.error("Program linking error:", gl.getProgramInfoLog(program));
         gl.deleteProgram(program);
     } else {
-        gl.program = program; // Save the program for use in js_draw_rectangle
+        gl.program = program;
         gl.useProgram(program);
 
-        // Set up resolution uniform
         const resolutionUniformLocation = gl.getUniformLocation(program, "u_resolution");
         gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
     }
@@ -73,8 +70,6 @@ window.addEventListener("keydown", (event) => {
     }
 });
 
-let canvasCleared = false; // Avoid multiple clears per frame
-
 function change_screen_color(red, green, blue, alpha) {
     const canvas = document.getElementById("my_canvas");
     const gl = canvas.getContext("webgl");
@@ -83,16 +78,11 @@ function change_screen_color(red, green, blue, alpha) {
         console.error("WebGL is not supported");
         return;
     }
-
-    // Set the WebGL clear color
     gl.clearColor(red, green, blue, alpha);
-
-    // Clear the screen
     gl.clear(gl.COLOR_BUFFER_BIT);
 }
 
 window.change_screen_color = change_screen_color;
-
 
 function js_draw_rectangle(x, y, width, height, red, green, blue, alpha) {
     const canvas = document.getElementById("my_canvas");
@@ -106,15 +96,14 @@ function js_draw_rectangle(x, y, width, height, red, green, blue, alpha) {
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
 
-    // Convert from pixel space to NDC (-1 to 1)
     const toClipSpace = (coord, size) => (coord / size) * 2 - 1;
 
     const x1 = toClipSpace(x, canvasWidth);
-    const y1 = toClipSpace(canvasHeight - (y + height), canvasHeight); // Invert Y-axis
+    const y1 = toClipSpace(canvasHeight - (y + height), canvasHeight);
     const x2 = toClipSpace(x + width, canvasWidth);
     const y2 = toClipSpace(canvasHeight - y, canvasHeight);
 
-    console.log(`Drawing rect at (${x}, ${y}) -> NDC: (${x1}, ${y1}), (${x2}, ${y2})`);
+    // console.log(`Drawing rect at (${x}, ${y}) -> NDC: (${x1}, ${y1}), (${x2}, ${y2})`);
 
     const vertices = new Float32Array([
         x1, y1,
@@ -131,48 +120,57 @@ function js_draw_rectangle(x, y, width, height, red, green, blue, alpha) {
     }
     gl.useProgram(gl.program);
 
-    // Create and bind buffer
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-    // Set attribute pointer
     const positionAttributeLocation = gl.getAttribLocation(gl.program, "a_position");
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
 
-    // Set rectangle color
     const colorUniformLocation = gl.getUniformLocation(gl.program, "u_color");
     gl.uniform4f(colorUniformLocation, red, green, blue, alpha);
 
-    // Draw the rectangle
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 window.js_draw_rectangle = js_draw_rectangle;
 
 
-function log_number(number) {
-    console.log("Score:", number);
+function update_score(number) {
+    // console.log("Score:", number);
 
-    // Optionally, update a score display in the HTML
     const scoreElement = document.getElementById("score");
     if (scoreElement) {
         scoreElement.textContent = `Score: ${number}`;
     }
 }
 
-// Make the function globally accessible for WebAssembly
-window.log_number = log_number;
-
+window.update_score = update_score;
 
 init().then(() => {
     console.log("WASM initialized");
 
-    // Test a red rectangle
-    js_draw_rectangle(100, 100, 50, 50, 1.0, 0.0, 0.0, 1.0);
+    // js_draw_rectangle(100, 100, 50, 50, 1.0, 0.0, 0.0, 1.0);
 
-    // Test a green rectangle
-    js_draw_rectangle(200, 200, 50, 50, 0.0, 1.0, 0.0, 1.0);
+    // js_draw_rectangle(200, 200, 50, 50, 0.0, 1.0, 0.0, 1.0);
+
+    function updateFPSDisplay() {
+        const fpsElement = document.getElementById("fps");
+        if (fpsElement) {
+            const fps = get_fps();
+            fpsElement.textContent = `FPS: ${fps.toFixed(2)}`;
+        }
+    }
+
+    setInterval(updateFPSDisplay, 250)
 });
 
+document.getElementById("speed_btn").addEventListener("click", (event) => {
+    const currentSpeed = parseFloat(event.target.getAttribute("data-speed"));
+    update_speed(currentSpeed);
+
+    const newSpeed = currentSpeed === 0.5 ? 1.0 : 0.5;
+    event.target.setAttribute("data-speed", newSpeed);
+    event.target.textContent = newSpeed === 0.5 ? "Increase Speed" : "Normal Speed";
+});
 
