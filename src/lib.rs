@@ -21,14 +21,38 @@ pub enum Key {
 
 pub enum Event {
     KeyDown(Key),
+    // MouseMove { x: f32, y: f32 },
+    // MouseClick { button: u8, x: f32, y: f32 },
     Draw,
 }
+
+pub enum GameState {
+    MainMenu,
+    Playing,
+    GameOver,
+}
+
+pub struct Game {
+    pub state: GameState,
+}
+
+
+
+pub struct Timer {
+    duration: f32,
+    elapsed: f32,
+}
+
+
 
 #[wasm_bindgen]
 extern "C" {
     pub fn update_score(number: usize);
     pub fn change_screen_color(red: f32, green: f32, blue: f32, alpha: f32);
     pub fn js_draw_rectangle(x: f32, y: f32, width: f32, height: f32, red: f32, green: f32, blue: f32, alpha: f32);
+    pub fn play_sound(src: &str);
+    pub fn js_draw_sprite(x: f32, y: f32, width: f32, height: f32, src: &str);
+    pub fn js_draw_text(text: &str, x: f32, y: f32, size: f32, r: f32, g: f32, b: f32, a: f32);
 }
 
 #[wasm_bindgen]
@@ -36,6 +60,14 @@ extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     pub fn log(s: &str);
 }
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    pub fn log_debug(s: &str);
+    // log_debug(&format!("Rectangles to draw: {:?}", rectangles));
+}
+
 
 thread_local! {
     pub static EVENT_HANDLER_AND_CONTEXT: std::cell::RefCell<(Box<dyn FnMut(&mut Context, Event)>, Context)> =
@@ -52,6 +84,49 @@ pub fn set_event_handler(function: impl FnMut(&mut Context, Event) + 'static) {
     EVENT_HANDLER_AND_CONTEXT.with(|event_handler_and_context| {
         event_handler_and_context.borrow_mut().0 = Box::new(function);
     });
+}
+
+impl Game {
+    pub fn new() -> Self {
+        Self {
+            state: GameState::MainMenu,
+        }
+    }
+
+    pub fn update(&mut self, event: Event) {
+        match self.state {
+            GameState::MainMenu => {
+                if let Event::KeyDown(Key::Space) = event {
+                    self.state = GameState::Playing;
+                }
+            }
+            GameState::Playing => {
+                // Update game logic
+            }
+            GameState::GameOver => {
+                // Handle Game Over
+            }
+        }
+    }
+}
+
+
+impl Timer {
+    pub fn new(duration: f32) -> Self {
+        Self {
+            duration,
+            elapsed: 0.0,
+        }
+    }
+
+    pub fn update(&mut self, delta_time: f32) -> bool {
+        self.elapsed += delta_time;
+        if self.elapsed >= self.duration {
+            self.elapsed = 0.0;
+            return true;
+        }
+        false
+    }
 }
 
 impl Context {

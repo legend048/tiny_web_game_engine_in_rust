@@ -49,7 +49,6 @@ pub fn run_game() {
                     _ => *dir,
                 };
             }
-
             Event::Draw => {
                 // log(&format!("FPS: {:.2}", context.fps));
 

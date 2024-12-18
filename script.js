@@ -147,6 +147,27 @@ function update_score(number) {
 
 window.update_score = update_score;
 
+window.js_draw_text = (text, x, y, size, r, g, b, a) => {
+    const ctx = canvas.getContext("2d");
+    ctx.font = `${size}px Arial`;
+    ctx.fillStyle = `rgba(${r * 255}, ${g * 255}, ${b * 255}, ${a})`;
+    ctx.fillText(text, x, y);
+};
+
+window.js_draw_sprite = (x, y, width, height, src) => {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+        gl.drawImage(img, x, y, width, height);
+    };
+};
+
+window.play_sound = (src) => {
+    const audio = new Audio(src);
+    audio.play();
+};
+
+
 init().then(() => {
     console.log("WASM initialized");
 
