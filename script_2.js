@@ -53,8 +53,18 @@ if (!gl) {
         gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
     }
 }
+// Draw rectangles function
+function drawRectangles(rectangles) {
+    rectangles.forEach(rect => {
+        const { x, y, width, height, r, g, b, a } = rect;
+        js_draw_rectangle(x, y, width, height, r, g, b, a)
+        
+
+    });
+}
 
 
+// Event listener for key presses
 window.addEventListener("keydown", (event) => {
     let keyCode = 0;
     switch (event.key) {
@@ -69,6 +79,11 @@ window.addEventListener("keydown", (event) => {
         key_pressed(keyCode);
     }
 });
+
+    // Initialize WASM
+    
+// }
+
 
 function change_screen_color(red, green, blue, alpha) {
     const canvas = document.getElementById("my_canvas");
@@ -136,23 +151,8 @@ function js_draw_rectangle(x, y, width, height, red, green, blue, alpha) {
 window.js_draw_rectangle = js_draw_rectangle;
 
 
-function update_score(number) {
-    // console.log("Score:", number);
-
-    const scoreElement = document.getElementById("score");
-    if (scoreElement) {
-        scoreElement.textContent = `Score: ${number}`;
-    }
-}
-
-window.update_score = update_score;
-
 init().then(() => {
     console.log("WASM initialized");
-
-    // js_draw_rectangle(100, 100, 50, 50, 1.0, 0.0, 0.0, 1.0);
-
-    // js_draw_rectangle(200, 200, 50, 50, 0.0, 1.0, 0.0, 1.0);
 
     function updateFPSDisplay() {
         const fpsElement = document.getElementById("fps");
@@ -162,32 +162,23 @@ init().then(() => {
         }
     }
 
-    setInterval(updateFPSDisplay, 250)
-
-    function render() {
-        // console.log("Batched Rectangles:", window.batched_rectangles);
-    
-        if (window.batched_rectangles) {
-            window.batched_rectangles.forEach(rect => {
-                const { x, y, width, height, r, g, b, a } = rect;
-                js_draw_rectangle(x, y, width, height, r, g, b, a)
-                
-    
-            });
-        }
-    
-        requestAnimationFrame(render);
-    }
-    
-    requestAnimationFrame(render);
+    setInterval(updateFPSDisplay, 250);
 });
 
-document.getElementById("speed_btn").addEventListener("click", (event) => {
-    const currentSpeed = parseFloat(event.target.getAttribute("data-speed"));
-    update_speed(currentSpeed);
 
-    const newSpeed = currentSpeed === 0.5 ? 1.0 : 0.5;
-    event.target.setAttribute("data-speed", newSpeed);
-    event.target.textContent = newSpeed === 0.5 ? "Increase Speed" : "Normal Speed";
-});
+// function render() {
+//     // console.log("Batched Rectangles:", window.batched_rectangles);
 
+//     if (window.batched_rectangles) {
+//         rectangles.forEach(rect => {
+//             const { x, y, width, height, r, g, b, a } = rect;
+//             js_draw_rectangle(x, y, width, height, r, g, b, a)
+            
+
+//         });
+//     }
+
+//     requestAnimationFrame(render);
+// }
+
+// requestAnimationFrame(render);

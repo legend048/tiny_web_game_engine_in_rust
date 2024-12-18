@@ -3,6 +3,21 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use crate::{*};
 use rand::Rng;
+use serde::Serialize;
+use std::fmt::Debug;
+
+#[derive(Serialize, Debug)]
+pub struct Rectangle {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+    a: f32,
+}
+
 
 thread_local! {
     pub static SPEED: RefCell<f64> = RefCell::new(1.0);
@@ -34,6 +49,7 @@ pub fn run_game() {
                     _ => *dir,
                 };
             }
+
             Event::Draw => {
                 // log(&format!("FPS: {:.2}", context.fps));
 
@@ -68,23 +84,60 @@ pub fn run_game() {
 
                 snake.insert(0, new_head);
 
-                for &(x, y) in &*snake {
-                    context.draw_rectangle(
-                        x as f32, 
-                        y as f32, 
-                        grid_size as f32, 
-                        grid_size as f32, 
-                        0.0, 1.0, 0.0, 1.0, 
-                    );
-                }
+                // for &(x, y) in &*snake {
+                //     context.draw_rectangle(
+                //         x as f32, 
+                //         y as f32, 
+                //         grid_size as f32, 
+                //         grid_size as f32, 
+                //         0.0, 1.0, 0.0, 1.0, 
+                //     );
+                // }
 
-                context.draw_rectangle(
-                    food_pos.0 as f32, 
-                    food_pos.1 as f32, 
-                    grid_size as f32, 
-                    grid_size as f32, 
-                    1.0, 0.0, 0.0, 1.0,
-                );
+                // context.draw_rectangle(
+                //     food_pos.0 as f32, 
+                //     food_pos.1 as f32, 
+                //     grid_size as f32, 
+                //     grid_size as f32, 
+                //     1.0, 0.0, 0.0, 1.0,
+                // );
+
+                let mut rectangles = vec![];
+
+                for &(x, y) in &*snake {
+                    rectangles.push(Rectangle {
+                        x: x as f32,
+                        y: y as f32,
+                        width: grid_size as f32,
+                        height: grid_size as f32,
+                        r: 0.0,
+                        g: 1.0,
+                        b: 0.0,
+                        a: 1.0,
+                    });
+                }
+            
+                // Add food rectangle
+                rectangles.push(Rectangle {
+                    x: food_pos.0 as f32,
+                    y: food_pos.1 as f32,
+                    width: grid_size as f32,
+                    height: grid_size as f32,
+                    r: 1.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 1.0,
+                });
+            
+                // log(&format!("Sending rectangles: {:?}", rectangles));
+                let js_value = serde_wasm_bindgen::to_value(&rectangles).unwrap();
+
+                js_sys::Reflect::set(
+                    &js_sys::global(),
+                    &"batched_rectangles".into(),
+                    &js_value,
+                ).unwrap();
+
             }
         }
     });
@@ -98,7 +151,7 @@ pub fn update_speed(new_speed: f64) {
 }
 
 fn generate_food(canvas_width: f64, canvas_height: f64, grid_size: f64) -> (f64, f64) {
-    let mut rng = rand::thread_rng();
+    let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
     let x = rng.gen_range(0..(canvas_width as usize / grid_size as usize)) as f64 * grid_size;
     let y = rng.gen_range(0..(canvas_height as usize / grid_size as usize)) as f64 * grid_size;
     (x, y)
@@ -113,8 +166,8 @@ pub fn animate_frame(_current_time: f64) {
 
 #[wasm_bindgen(start)]
 pub fn main() {
-    run_game(); // Start the game logic
-    start_animation_loop(); // Start the animation loop
+    run_game();
+    start_animation_loop();
 }
 
 fn start_animation_loop() {
@@ -125,13 +178,10 @@ fn start_animation_loop() {
     let g = Rc::clone(&f);
 
     *f.borrow_mut() = Some(Closure::wrap(Box::new(move |current_time: f64| {
-        // Clone the Rc<RefCell> for the next animation frame
         let g_clone = Rc::clone(&g);
 
-        // Call the Rust animate function with the current time
         crate::animate(current_time);
 
-        // Request the next animation frame
         window()
             .unwrap()
             .request_animation_frame(g_clone.borrow().as_ref().unwrap().as_ref().unchecked_ref())

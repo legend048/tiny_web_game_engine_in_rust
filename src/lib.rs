@@ -75,7 +75,7 @@ impl Context {
             self.frame_count = 0;
             self.elapsed_time = 0.0;
 
-            // log(&format!("Calculated FPS: {:.2}", self.fps));
+            // log(&format!("Frame time: {:.2}", self.delta_time));
         }
 
         self.delta_time
