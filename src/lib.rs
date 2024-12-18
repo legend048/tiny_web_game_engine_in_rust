@@ -1,6 +1,8 @@
 pub mod game;
 
 use wasm_bindgen::prelude::*;
+use std::collections::HashMap;
+// use std::cell::RefCell;
 
 
 pub struct Context {
@@ -19,10 +21,12 @@ pub enum Key {
     Space,
 }
 
+pub type EventCallback = Box<dyn Fn(&mut Context, Event)>;
+
 pub enum Event {
     KeyDown(Key),
-    // MouseMove { x: f32, y: f32 },
-    // MouseClick { button: u8, x: f32, y: f32 },
+    MouseMove { x: f32, y: f32 },
+    MouseClick { button: u8, x: f32, y: f32 },
     Draw,
 }
 
@@ -36,13 +40,12 @@ pub struct Game {
     pub state: GameState,
 }
 
-
-
 pub struct Timer {
     duration: f32,
     elapsed: f32,
 }
 
+pub static TARGET_FPS: RefCell<f64> = RefCell::new(60.0);
 
 
 #[wasm_bindgen]
@@ -70,21 +73,26 @@ extern "C" {
 
 
 thread_local! {
-    pub static EVENT_HANDLER_AND_CONTEXT: std::cell::RefCell<(Box<dyn FnMut(&mut Context, Event)>, Context)> =
-        std::cell::RefCell::new((Box::new(|_, _| {}), Context { 
-            last_time: 0.0,
-            delta_time: 0.0,
-            frame_count: 0,
-            fps: 0.0,
-            elapsed_time: 0.0,
-        }));
+    pub static EVENT_HANDLERS_AND_CONTEXT: std::cell::RefCell<(HashMap<String, Box<dyn FnMut(&mut Context, Event)>>, Context)> =
+        std::cell::RefCell::new((
+            HashMap::new(),
+            Context { 
+                last_time: 0.0,
+                delta_time: 0.0,
+                frame_count: 0,
+                fps: 0.0,
+                elapsed_time: 0.0,
+            }
+        ));
 }
 
-pub fn set_event_handler(function: impl FnMut(&mut Context, Event) + 'static) {
-    EVENT_HANDLER_AND_CONTEXT.with(|event_handler_and_context| {
-        event_handler_and_context.borrow_mut().0 = Box::new(function);
+pub fn register_event_handler(event_name: &str, handler: impl FnMut(&mut Context, Event) + 'static) {
+    EVENT_HANDLERS_AND_CONTEXT.with(|handlers_and_context| {
+        let mut handlers = handlers_and_context.borrow_mut();
+        handlers.0.insert(event_name.to_string(), Box::new(handler));
     });
 }
+
 
 impl Game {
     pub fn new() -> Self {
@@ -158,12 +166,23 @@ impl Context {
 }
 
 pub fn send_event(event: Event) {
-    EVENT_HANDLER_AND_CONTEXT.with(|event_handler_and_context| {
-        let mut borrow = event_handler_and_context.borrow_mut();
-        let (event_handler, context) = &mut *borrow;
-        (event_handler)(context, event)
+    let event_name = match &event {
+        Event::KeyDown(_) => "KeyDown",
+        Event::MouseMove { .. } => "MouseMove",
+        Event::MouseClick { .. } => "MouseClick",
+        Event::Draw => "Draw",
+    };
+
+    EVENT_HANDLERS_AND_CONTEXT.with(|handlers_and_context| {
+        let mut handlers = handlers_and_context.borrow_mut();
+        let (handlers_map, context) = &mut *handlers;
+
+        if let Some(handler) = handlers_map.get_mut(event_name) {
+            handler(context, event);
+        }
     });
 }
+
 
 #[wasm_bindgen]
 pub extern "C" fn key_pressed(value: usize) {
@@ -181,23 +200,29 @@ pub extern "C" fn key_pressed(value: usize) {
 
 #[wasm_bindgen]
 pub extern "C" fn animate(current_time: f64) {
-    let current_time_seconds = current_time / 1000.0;
-    // log(&format!("Animate called at time: {:.4} seconds", current_time_seconds));
-    EVENT_HANDLER_AND_CONTEXT.with(|ctx| {
-        let mut borrow = ctx.borrow_mut();
+    let current_time_seconds = current_time / 1000.0; // Convert milliseconds to seconds
+
+    EVENT_HANDLERS_AND_CONTEXT.with(|handlers_and_context| {
+        let mut borrow = handlers_and_context.borrow_mut();
         let (_, context) = &mut *borrow;
-        context.update_time(current_time_seconds); // Pass time in seconds
+        context.update_time(current_time_seconds); // Update the time in the context
     });
-    
-    // log(&format!("Frame time: {:.2} ms", self.delta_time * 1000.0));
+
+    // Dispatch the Draw event
     send_event(Event::Draw);
 }
 
+
 #[wasm_bindgen]
 pub fn get_fps() -> f64 {
-    EVENT_HANDLER_AND_CONTEXT.with(|ctx| {
-        let borrow = ctx.borrow();
+    EVENT_HANDLERS_AND_CONTEXT.with(|handlers_and_context| {
+        let borrow = handlers_and_context.borrow();
         let (_, context) = &*borrow;
-        context.fps
+        context.fps // Return the FPS value
     })
+}
+
+#[wasm_bindgen]
+pub fn set_target_fps(fps: f64) {
+    TARGET_FPS.with(|target| *target.borrow_mut() = fps);
 }

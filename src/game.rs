@@ -33,13 +33,11 @@ pub fn run_game() {
     let food = Rc::new(RefCell::new(generate_food(canvas_width, canvas_height, grid_size)));
     let mut score = 0;
 
-    set_event_handler({
-        let snake = Rc::clone(&snake);
+    // Register KeyDown handler
+    register_event_handler("KeyDown", {
         let direction = Rc::clone(&direction);
-        let food = Rc::clone(&food);
-
-        move |context, event| match event {
-            Event::KeyDown(key) => {
+        move |_context, event| {
+            if let Event::KeyDown(key) = event {
                 let mut dir = direction.borrow_mut();
                 *dir = match key {
                     Key::Up if *dir != (0.0, 1.0) => (0.0, -1.0),
@@ -49,98 +47,89 @@ pub fn run_game() {
                     _ => *dir,
                 };
             }
-            Event::Draw => {
-                // log(&format!("FPS: {:.2}", context.fps));
+        }
+    });
 
-                context.clear_screen_color(0.0, 0.0, 0.0, 1.0);
+    // Register Draw handler
+    register_event_handler("Draw", {
+        let snake = Rc::clone(&snake);
+        let direction = Rc::clone(&direction);
+        let food = Rc::clone(&food);
+        move |context, _event| {
+            context.clear_screen_color(0.0, 0.0, 0.0, 1.0);
 
-                let mut snake = snake.borrow_mut();
-                let dir = *direction.borrow();
+            let mut snake = snake.borrow_mut();
+            let dir = *direction.borrow();
 
-                let (head_x, head_y) = snake[0];
-                let mut new_head = (head_x + dir.0 * grid_size, head_y + dir.1 * grid_size);
+            let (head_x, head_y) = snake[0];
+            let mut new_head = (head_x + dir.0 * grid_size, head_y + dir.1 * grid_size);
 
-                if new_head.0 < 0.0 {
-                    new_head.0 = canvas_width - grid_size;
-                } else if new_head.0 >= canvas_width {
-                    new_head.0 = 0.0;
-                }
+            // Wrap around the screen
+            if new_head.0 < 0.0 {
+                new_head.0 = canvas_width - grid_size;
+            } else if new_head.0 >= canvas_width {
+                new_head.0 = 0.0;
+            }
 
-                if new_head.1 < 0.0 {
-                    new_head.1 = canvas_height - grid_size;
-                } else if new_head.1 >= canvas_height {
-                    new_head.1 = 0.0;
-                }
+            if new_head.1 < 0.0 {
+                new_head.1 = canvas_height - grid_size;
+            } else if new_head.1 >= canvas_height {
+                new_head.1 = 0.0;
+            }
 
-                let mut food_pos = food.borrow_mut();
-                if (new_head.0 - food_pos.0).abs() < f64::EPSILON && (new_head.1 - food_pos.1).abs() < f64::EPSILON {
-                    score += 1;
-                    update_score(score);
-                    *food_pos = generate_food(canvas_width, canvas_height, grid_size);
-                } else {
-                    snake.pop();
-                }
+            // Check if the snake eats the food
+            let mut food_pos = food.borrow_mut();
+            if (new_head.0 - food_pos.0).abs() < f64::EPSILON && (new_head.1 - food_pos.1).abs() < f64::EPSILON {
+                score += 1;
+                update_score(score);
+                *food_pos = generate_food(canvas_width, canvas_height, grid_size);
+            } else {
+                snake.pop();
+            }
 
-                snake.insert(0, new_head);
+            snake.insert(0, new_head);
 
-                // for &(x, y) in &*snake {
-                //     context.draw_rectangle(
-                //         x as f32, 
-                //         y as f32, 
-                //         grid_size as f32, 
-                //         grid_size as f32, 
-                //         0.0, 1.0, 0.0, 1.0, 
-                //     );
-                // }
+            // Prepare rectangles for rendering
+            let mut rectangles = vec![];
 
-                // context.draw_rectangle(
-                //     food_pos.0 as f32, 
-                //     food_pos.1 as f32, 
-                //     grid_size as f32, 
-                //     grid_size as f32, 
-                //     1.0, 0.0, 0.0, 1.0,
-                // );
-
-                let mut rectangles = vec![];
-
-                for &(x, y) in &*snake {
-                    rectangles.push(Rectangle {
-                        x: x as f32,
-                        y: y as f32,
-                        width: grid_size as f32,
-                        height: grid_size as f32,
-                        r: 0.0,
-                        g: 1.0,
-                        b: 0.0,
-                        a: 1.0,
-                    });
-                }
-            
-                // Add food rectangle
+            // Add snake rectangles
+            for &(x, y) in &*snake {
                 rectangles.push(Rectangle {
-                    x: food_pos.0 as f32,
-                    y: food_pos.1 as f32,
+                    x: x as f32,
+                    y: y as f32,
                     width: grid_size as f32,
                     height: grid_size as f32,
-                    r: 1.0,
-                    g: 0.0,
+                    r: 0.0,
+                    g: 1.0,
                     b: 0.0,
                     a: 1.0,
                 });
-            
-                // log(&format!("Sending rectangles: {:?}", rectangles));
-                let js_value = serde_wasm_bindgen::to_value(&rectangles).unwrap();
-
-                js_sys::Reflect::set(
-                    &js_sys::global(),
-                    &"batched_rectangles".into(),
-                    &js_value,
-                ).unwrap();
-
             }
+
+            // Add food rectangle
+            rectangles.push(Rectangle {
+                x: food_pos.0 as f32,
+                y: food_pos.1 as f32,
+                width: grid_size as f32,
+                height: grid_size as f32,
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            });
+
+            // Send rectangles to JavaScript for rendering
+            let js_value = serde_wasm_bindgen::to_value(&rectangles).unwrap();
+            js_sys::Reflect::set(
+                &js_sys::global(),
+                &"batched_rectangles".into(),
+                &js_value,
+            ).unwrap();
         }
     });
 }
+
+
 
 #[wasm_bindgen]
 pub fn update_speed(new_speed: f64) {
