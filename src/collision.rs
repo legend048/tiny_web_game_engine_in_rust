@@ -1,3 +1,5 @@
+use crate::game::Rectangle;
+
 pub fn check_collision(rect1: &Rectangle, rect2: &Rectangle) -> bool {
     rect1.x < rect2.x + rect2.width &&
     rect1.x + rect1.width > rect2.x &&
